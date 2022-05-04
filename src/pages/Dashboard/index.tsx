@@ -1,8 +1,8 @@
 import React from 'react'
-
 import { Title, Form, Repos, Error } from './styles'
 import logo from '../../assets/logo.svg'
 import { FiChevronRight } from 'react-icons/fi'
+import { Link } from 'react-router-dom'
 
 import { api } from '../../services/api'
 
@@ -19,10 +19,22 @@ interface GithubRepository {
 
 export const Dashboard: React.FC = () => {
 
-    const [repos, setRepos] = React.useState<GithubRepository[]>([])
+    const [repos, setRepos] = React.useState<GithubRepository[]>(() => {
+        const storageRepos = localStorage.getItem('@GitCollection:repositories')
+
+        if (storageRepos) {
+            return JSON.parse(storageRepos)
+        }
+
+        return []
+    })
     const [newRepo, setNewRepo] = React.useState('')
     const [inputError, setInputError] = React.useState('')
-
+    const formEl = React.useRef<HTMLFormElement | null>(null)
+    
+    React.useEffect(() => {
+        localStorage.setItem('@GitCollection:repositories', JSON.stringify(repos))
+    }, [repos])
 
     function handleInputChange(event: React.ChangeEvent<HTMLInputElement>): void {
         setNewRepo(event.target.value)
@@ -36,12 +48,19 @@ export const Dashboard: React.FC = () => {
             return
         }
 
-        const response = await api.get<GithubRepository>(`/repos/${newRepo}`)
+        try {
+            const response = await api.get<GithubRepository>(`/repos/${newRepo}`)
 
-        const repository = response.data
+            const repository = response.data
 
-        setRepos([...repos, repository])
-        setNewRepo('')
+            setRepos([...repos, repository])
+            formEl.current?.reset()
+            setNewRepo('')
+            setInputError('')
+
+        } catch (error) {
+            setInputError('Repositório não encontrado no Github')
+        }
     }
 
     return (
@@ -52,6 +71,7 @@ export const Dashboard: React.FC = () => {
             </Title>
 
             <Form
+                ref={formEl}
                 onSubmit={handleAddRepo}
                 hasError={Boolean(inputError)}
             >
@@ -62,7 +82,7 @@ export const Dashboard: React.FC = () => {
 
             <Repos>
                 {repos.map((repository, index) => (
-                    <a href="/repositories" key={index}>
+                    <Link to={`/repositories/${repository.full_name}`} key={index}>
                         <img 
                             src={repository.owner.avatar_url}
                             alt={repository.owner.login} 
@@ -72,7 +92,7 @@ export const Dashboard: React.FC = () => {
                             <p>{repository.description}</p>
                         </div>
                         <FiChevronRight size={20} />
-                    </a>
+                    </Link>
                 ))}
             </Repos>
         </>
